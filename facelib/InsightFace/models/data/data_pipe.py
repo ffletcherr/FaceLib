@@ -5,7 +5,6 @@ from PIL import ImageFile
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 import numpy as np
-import bcolz
 
 
 def de_preprocess(tensor):
@@ -48,12 +47,6 @@ def get_train_loader(conf):
     return loader, class_num
 
 
-def get_val_pair(path, name):
-    carray = bcolz.carray(rootdir=path / name, mode='r')
-    issame = np.load(path / '{}_list.npy'.format(name))
-    return carray, issame
-
-
 def get_val_data(data_path):
     agedb_30, agedb_30_issame = get_val_pair(data_path, 'agedb_30')
     cfp_fp, cfp_fp_issame = get_val_pair(data_path, 'cfp_fp')
@@ -61,28 +54,3 @@ def get_val_data(data_path):
     return agedb_30, cfp_fp, lfw, agedb_30_issame, cfp_fp_issame, lfw_issame
 
 
-class train_dataset(Dataset):
-    def __init__(self, imgs_bcolz, label_bcolz, h_flip=True):
-        self.imgs = bcolz.carray(rootdir=imgs_bcolz)
-        self.labels = bcolz.carray(rootdir=label_bcolz)
-        self.h_flip = h_flip
-        self.length = len(self.imgs) - 1
-        if h_flip:
-            self.transform = trans.Compose([
-                trans.ToPILImage(),
-                trans.RandomHorizontalFlip(),
-                trans.ToTensor(),
-                trans.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
-            ])
-        self.class_num = self.labels[-1] + 1
-
-    def __len__(self):
-        return self.length
-
-    def __getitem__(self, index):
-        img = torch.tensor(self.imgs[index + 1], dtype=torch.float)
-        label = torch.tensor(self.labels[index + 1], dtype=torch.long)
-        if self.h_flip:
-            img = de_preprocess(img)
-            img = self.transform(img)
-        return img, label
